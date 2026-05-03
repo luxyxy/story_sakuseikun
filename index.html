@@ -196,11 +196,33 @@
             border: 1px solid #808080;
             cursor: pointer;
             font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .layer-item.selected {
             background: #000080;
             color: white;
+        }
+
+        .layer-item-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .layer-item-button {
+            background: #C0C0C0;
+            border: 1px solid;
+            border-color: #FFFFFF #808080 #808080 #FFFFFF;
+            padding: 2px 6px;
+            font-size: 11px;
+            cursor: pointer;
+            min-width: auto;
+        }
+
+        .layer-item-button:active {
+            border-color: #808080 #FFFFFF #FFFFFF #808080;
         }
 
         .hidden {
@@ -237,11 +259,11 @@
                 <div class="controls">
                     <input type="file" id="imageInput" accept="image/*">
                     <button class="button" onclick="addText()">テキスト追加</button>
-                    <button class="button" onclick="undo()" id="undoBtn">↶ 戻す</button>
-                    <button class="button" onclick="redo()" id="redoBtn">↷ やり直す</button>
-                    <button class="button" onclick="saveStory()">💾 保存</button>
-                    <button class="button" onclick="loadStory()">📂 読込</button>
-                    <button class="button" onclick="downloadImage()">⬇ ダウンロード</button>
+                    <button class="button" onclick="undo()" id="undoBtn">戻す</button>
+                    <button class="button" onclick="redo()" id="redoBtn">やり直す</button>
+                    <button class="button" onclick="saveStory()">保存</button>
+                    <button class="button" onclick="loadStory()">読込</button>
+                    <button class="button" onclick="downloadImage()">ダウンロード</button>
                 </div>
 
                 <div class="canvas-container" id="canvasContainer">
@@ -670,6 +692,60 @@
             updatePropertiesPanel();
         }
 
+        // ===== レイヤー複製 =====
+        function duplicateLayer(elementId) {
+            const element = elements.find(el => el.id === elementId);
+            if (!element) return;
+
+            const newElement = new CanvasElement(element.type, element.data);
+            newElement.x = element.x + 10;
+            newElement.y = element.y + 10;
+            newElement.width = element.width;
+            newElement.height = element.height;
+            newElement.rotation = element.rotation;
+            newElement.opacity = element.opacity;
+            newElement.aspectRatio = element.aspectRatio;
+            newElement.originalAspectRatio = element.originalAspectRatio;
+
+            elements.push(newElement);
+            history.saveState(getCurrentState());
+            redrawCanvas();
+            updateLayersList();
+        }
+
+        // ===== レイヤー削除 =====
+        function deleteLayer(elementId) {
+            elements = elements.filter(el => el.id !== elementId);
+            if (selectedElementId === elementId) {
+                selectedElementId = null;
+                updatePropertiesPanel();
+            }
+            history.saveState(getCurrentState());
+            redrawCanvas();
+            updateLayersList();
+        }
+
+        // ===== レイヤーZ-index制御 =====
+        function moveLayerUp(elementId) {
+            const index = elements.findIndex(el => el.id === elementId);
+            if (index < elements.length - 1) {
+                [elements[index], elements[index + 1]] = [elements[index + 1], elements[index]];
+                history.saveState(getCurrentState());
+                redrawCanvas();
+                updateLayersList();
+            }
+        }
+
+        function moveLayerDown(elementId) {
+            const index = elements.findIndex(el => el.id === elementId);
+            if (index > 0) {
+                [elements[index], elements[index - 1]] = [elements[index - 1], elements[index]];
+                history.saveState(getCurrentState());
+                redrawCanvas();
+                updateLayersList();
+            }
+        }
+
         // ===== レイヤーリスト更新 =====
         function updateLayersList() {
             const layersList = document.getElementById('layersList');
@@ -681,9 +757,57 @@
                 if (el.id === selectedElementId) layerItem.classList.add('selected');
 
                 const label = el.type === 'image' ? '画像' : `テキスト: ${el.data.content.substring(0, 20)}`;
-                layerItem.textContent = label;
-                layerItem.onclick = () => selectElement(el.id);
+                const labelSpan = document.createElement('span');
+                labelSpan.textContent = label;
+                labelSpan.style.flex = '1';
+                labelSpan.onclick = () => selectElement(el.id);
 
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.className = 'layer-item-buttons';
+
+                const upBtn = document.createElement('button');
+                upBtn.className = 'layer-item-button';
+                upBtn.textContent = '↑';
+                upBtn.title = '上に移動';
+                upBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    moveLayerUp(el.id);
+                };
+
+                const downBtn = document.createElement('button');
+                downBtn.className = 'layer-item-button';
+                downBtn.textContent = '↓';
+                downBtn.title = '下に移動';
+                downBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    moveLayerDown(el.id);
+                };
+
+                const dupBtn = document.createElement('button');
+                dupBtn.className = 'layer-item-button';
+                dupBtn.textContent = '複';
+                dupBtn.title = '複製';
+                dupBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    duplicateLayer(el.id);
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'layer-item-button';
+                delBtn.textContent = '×';
+                delBtn.title = '削除';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteLayer(el.id);
+                };
+
+                buttonsDiv.appendChild(upBtn);
+                buttonsDiv.appendChild(downBtn);
+                buttonsDiv.appendChild(dupBtn);
+                buttonsDiv.appendChild(delBtn);
+
+                layerItem.appendChild(labelSpan);
+                layerItem.appendChild(buttonsDiv);
                 layersList.appendChild(layerItem);
             });
         }
